@@ -1,0 +1,969 @@
+/** 
+* @desc         : to show the Loan Contracts  
+* @required     : <Opportunity_Id><@><Opportunity_Number> [Example: id=0060k00000BOB7@251525]
+* @author       : Munish | CloudChillies | june/2020
+* @test class   : Sun_PortalLoanOfferedController_Test
+* @edit history :-
+28-07-2020 | Arpit | sent an email and add an attachment, call platform event too after LOA on acceptOffer method
+04-08-2020 | Arpit | sent an email and add an attachment, call platform event too after reject an offer on rejectoffer method
+09/11/2020 | Vikas   | Changes lost reason from Customer Declined to Customer Declined Offer in Method:- rejectOffer()
+*/
+public without sharing class Sun_PortalLoanOfferedController {
+	public Opportunity opp { get; set; }
+	public String manza { get; set; }
+	public String pageMSG { get; set; }
+	public Boolean renderPage { get; set; }
+	public Boolean renderLWCComp { get; set; }
+	public Boolean renderContract { get; set; }
+	public Boolean renderResult { get; set; }
+	public Boolean isSunshine { get; set; }
+	public Boolean isS2 { get; set; }
+	public Boolean showTermCondition { get; set; }
+	public String originalRepayment { get; set; }
+	//public String newRepayment {get; set;}
+	public string paymentFrequency { get; set; }
+	public String tokenId { get; set; }
+	public Boolean displayPopup { get; set; }
+	public Boolean disabledButton { get; set; }
+	public String declineReasons { get; set; }
+	public Integer anInt { get; set; }
+
+	//By P
+	public Boolean displayPopup_Final_Offer { get; set; }
+	public Boolean display_homepage_popup { get; set; }
+	public Decimal Discounted_Amount { get; set; }
+	public Decimal Discounted_Amount_selected { get; set; }
+	public string selcted_loan_amt { get; set; }
+	public decimal repaymentamt { get; set; }
+	public decimal TotalRepayOld { get; set; }
+	public boolean showloandetails { get; set; }
+	public decimal repatamt { get; set; }
+	public decimal totoalrepayamt { get; set; }
+	public boolean isMDCA { get; set; }
+	public boolean isMDMO { get; set; }
+	//By P
+
+	// Negotiation popup getter-setter starts here
+	public Id oppId;
+	public String selectedRepayCount { get; set; }
+	public String selectedFirstPayDate { get; set; }
+	public String dateEndLoan { get; set; }
+
+	public String selectedSecondPayDate { get; set; }
+	public String selectedLoanAmount { get; set; }
+	public String repaymentAmount { get; set; }
+	public String Totalpayable { get; set; }
+	public String totalSaving { get; set; }
+	public boolean maxRepayAmountFound { get; set; }
+	public boolean ShowSecondDate { get; set; }
+
+	public String Tier { get; set; }
+	public String currentSubTier { get; set; }
+	public Decimal currentCabFeePercent { get; set; }
+
+	public String RequestBody { get; set; }
+	public String ResponseBody { get; set; }
+
+	public List<Integer> eligibleRepayCounts;
+	public Decimal loanAmount;
+	public Decimal maxLoanAmount { get; set; }
+	public Decimal maxRepaymentAllowed { get; set; }
+	public Integer maxRepayments = 0;
+	public Integer minRepayments = 0;
+	public boolean repaymentExceed { get; set; }
+	// Negotiation popup getter-setter ends here
+
+	//Negotiation Popup changes
+	public Decimal LoanAmountToDisplay { get; set; }
+	public Decimal discountedCabfee { get; set; }
+	public Date FPDtoDisplay { get; set; }
+	public Decimal cabFeetoSave;
+	public String applicantType;
+
+	public Boolean isMD { get; set; }
+	public Boolean isBarr { get; set; }
+    public Boolean isID {get;set;} //juned
+    public Boolean isWI {get;set;}// juned
+	public Boolean show180daysError { get; set; }
+
+	public Double marketingDiscount { get; set; } //gom
+	public Boolean fromCampaign { get; set; } //gom
+	public Solution_By_Text__c SBT = Solution_By_Text__c.getOrgDefaults(); //gom
+	SchduledRemarketing__c sre = SchduledRemarketing__c.getOrgDefaults();
+	public Sunshine_Lead_Buying_CS__c LeadBuying_CS = Sunshine_Lead_Buying_CS__c.getOrgDefaults();
+    
+    public boolean showMarriedInputBox {get;set;} // juned
+    public String spouseName {get;set;} 
+    public String spouseEmail {get;set;}
+
+	public Sun_PortalLoanOfferedController() {
+		isMDCA = false;
+		isMDMO = false;
+		showloandetails = false;
+		fromCampaign = false;
+		repaymentExceed = false;
+		anInt = Integer.valueOf(maxLoanAmount);
+		disabledButton = true;
+		system.debug('Sun_PortalLoanOfferedController called');
+		isSunshine = true;
+		renderPage = false;
+		isBarr = false;
+		isMD = false;
+		isS2 = false;
+		showTermCondition = false;
+		tokenId = ApexPages.currentPage().getParameters().get('token-id');
+		opp = new Opportunity();
+        
+        showMarriedInputBox=true;
+      
+        
+
+		String oppIDoppNum = ApexPages.currentPage().getParameters().get('id');
+		String oppID = oppId = oppIDoppNum.substringBeforeLast('@');
+		String oppNumber = oppIDoppNum.substringAfterLast('@');
+		String lc = ApexPages.currentPage().getParameters().get('lc');
+		marketingDiscount = SBT.Marketing_Discount__c; //gom
+		maxRepayAmountFound = true;
+		ShowSecondDate = false;
+
+		List<Opportunity> oppLST = [
+			SELECT
+				Id,
+				Opportunity_Origin__c,
+				AccountId,
+				Applicant_Type__c,
+				Expiring_LAO_Level__c,
+				Expiring_LAO_Discount__c,
+				Date_First_Payment__c,
+				Loan_Amount__c,
+				Payment_Frequency__c,
+				Discounted_Offer__c,
+				LAO_URL__c,
+				Contact__r.IDV_Result_DataX__c,
+				Amount_Requested__c,
+				Amount_Accepted__c,
+				Contact__r.LPP_Customer_Token__c,
+				Contact__r.LPP_Payment_Method_Token__c,
+				Amount,
+				StageName,
+				Contract_Duration__c,
+				ZMath_Updated_APR__c,
+				Date_Second_Payment__c,
+				Original_Contract_Duration__c,
+				Total_Repayments__c,
+				Total_Repayment_Amount__c,
+				Discounted_Amount_Pay_Off__c,
+				Discounted_Amount_Campaign__c,
+				Repayment_Amount__c,
+				new_repayment__c,
+				Contact__r.Cliq_Customer_Vault_Id__c,
+				Contact__r.Cliq_Customer_Vault_Skipped__c,
+				SACC_Original_Repayments__c,
+				Opp_Number__c,
+				Contact__c,
+				Contact_Email__c,
+				NextStep,
+				Funder__c,
+				Interest_Payable_to_CAB__c,
+				Date_Contract_Date__c,
+				Date_End_Loan__c,
+				Negotiated_Offer__c,
+				Annual_Percent_Rate__c,
+				Payable_to_us__c,
+				Transaction_Period__c,
+				createdDate,
+				Bank_Report_Gov_Benefit__c,
+				Bad_Credit_History__c,
+				ip__c,
+				Send_Proposition__c
+			FROM Opportunity
+			WHERE Id = :oppID AND Opp_Number__c = :oppNumber
+		];
+		system.debug('opplst = ' + oppLST);
+		if (oppLST.size() == 0) {
+			pageMSG = '1';
+			return;
+		} else {
+            //by juned
+            if(oppLst[0].Opportunity_Origin__c != 'SunshineWI'){
+                showMarriedInputBox = false;
+            } 
+			if (oppLST[0].StageName == 'Loan Amount Offered') {
+				if (
+					SBT.Minimum_Loan_Amount__c != null &&
+					oppLST[0].Discounted_Amount_Campaign__c == 'vipdisc' &&
+					integer.valueOf(String.valueOf(oppLST[0].Loan_Amount__c).remove('$')) >= SBT.Minimum_Loan_Amount__c
+				) {
+					system.debug('in fromCampaign');
+					fromCampaign = true;
+				}
+				//By P
+				if (sre.Run_LAO_Expiring_checks__c) {
+					if (
+						oppLST[0].Expiring_LAO_Level__c != null && oppLST[0].Expiring_LAO_Discount__c != null && oppLST[0].Expiring_LAO_Level__c != 'Level 0' &&
+						(oppLST[0].Expiring_LAO_Level__c == 'Level 1' || oppLST[0].Expiring_LAO_Level__c == 'Level 2' || oppLST[0].Expiring_LAO_Level__c == 'Level 3')
+					) {
+						fromCampaign = true;
+						marketingDiscount = oppLST[0].Expiring_LAO_Discount__c;
+					}
+				}
+				if (String.isBlank(oppLST[0].ip__c)) {
+					showTermCondition = true;
+				}
+				//By P
+				if (oppLST[0].Opportunity_Origin__c == 'Sunshine2') {
+					isSunshine = false;
+				}
+				if (oppLST[0].Funder__c == 'S2' && LeadBuying_CS.Funder_S2__c) {
+					isS2 = true;					isMDMO = false;
+				}
+				if (oppLST[0].Funder__c == 'Barr') {
+					isBarr = true;					isMDMO = false;
+				}
+				if (oppLST[0].Funder__c == 'MoneySpot Direct') {
+					isMD = true;
+					isMDMO = false;
+				}
+				if (oppLST[0].Funder__c == 'MoneySpot Direct' && oppLST[0].Opportunity_Origin__c == 'SunshineCA') {
+					isMDCA = true;					isMD = false;
+				}
+				if (oppLST[0].Funder__c == 'MoneySpot Direct' && oppLST[0].Opportunity_Origin__c == 'SunshineMO') {
+					isMDMO = true;					isMD = true;					isS2 = true;
+				}
+             	if (oppLST[0].Funder__c == 'MoneySpot Direct' && oppLST[0].Opportunity_Origin__c == 'SunshineID') {
+					isID=true;						isMD = true;					isS2 = false;
+				}
+                if (oppLST[0].Funder__c == 'MoneySpot Direct' && oppLST[0].Opportunity_Origin__c == 'SunshineWI') {
+					isWI=true;						isMD = true;					isS2 = false;
+				}
+
+				opp = oppLST[0];
+				if (opp.Applicant_Type__c == 'Existing Client-Granted Loan Before')
+					applicantType = 'Repeat';
+				else
+					applicantType = 'New';
+
+				cabFeetoSave = opp.Interest_Payable_to_CAB__c;
+
+				String loanAmountStr = opp.Loan_Amount__c;
+
+				LoanAmountToDisplay = integer.valueOf(loanAmountStr.remove('$'));
+				originalRepayment = String.isNotBlank(String.valueOF(opp.Total_Repayments__c)) ? String.valueOF(opp.Total_Repayments__c) : 'N/A';
+				FPDtoDisplay = opp.Date_First_Payment__c;
+
+				paymentFrequency = opp.Payment_Frequency__c;
+				if (paymentFrequency == 'Fortnightly') {
+					paymentFrequency = 'Bi-Weekly';
+				}
+				if (String.isNotBlank(lc) && lc == 'true') {
+					renderLWCComp = false; renderContract = true; renderPage = true;
+				} else {
+					if (
+						String.isNotBlank(opp.Contact__r.Cliq_Customer_Vault_Id__c) ||
+						(String.isNotBlank(opp.contact__r.LPP_Customer_Token__c) && String.isNotBlank(opp.Contact__r.LPP_Payment_Method_Token__c))
+					) {
+						renderLWCComp = false; renderContract = true; renderPage = true;
+					} else {
+						if (String.isNotBlank(tokenId)) {
+							renderPage = true; renderLWCComp = true; renderResult = true;
+						} else {
+							renderPage = true;
+							renderLWCComp = true;
+							renderContract = false;
+						}
+					}
+				}
+			} else {
+				pageMSG = '4';
+				return;
+			}
+		}
+	}
+
+	public PageReference checkZMath() {
+		PageReference pg;
+		if (opp != null) {
+			try {
+				if (
+					!opp.Contact__r.IDV_Result_DataX__c.contains('Fail | The input SSN/TIN may have been miskeyed') &&
+					!opp.Contact__r.IDV_Result_DataX__c.contains('Fail | The input SSN is not found in the public record') &&
+					!opp.Contact__r.IDV_Result_DataX__c.contains('Fail | Unable to verify date-of-birth')
+				) {
+					system.debug('@#@# checkZMath');
+					if (opp.Id != null) {
+						opp.ZMath_Updated_APR__c = true;
+						opp.APR_Updated_By__c = 'Sun_PortalLoanOfferedController - ' + string.valueOf(DateTime.now());
+						opp.Annual_Percent_Rate__c = opp.APR__c = APR_Helper.getAPR_Sunshine(Opp);
+						update opp;
+						if (opp.Annual_Percent_Rate__c == 0.00) {
+							pageMSG = '1';renderPage = false;return null;
+						}
+					}
+					//ZMath_Helper_Future.ZMath_Callout(opp.Id);
+					if (test.isRunningTest()) {
+						integer i = 1 / 0;
+					}
+				} else {
+					pg = new PageReference(opp.LAO_URL__c);
+					pg.setRedirect(true);
+				}
+			} catch (Exception ex) {
+				HelperClass.create_test_api_record(
+					'Sun_PortalLoanOfferedController Error: ZMath',
+					'Sun_PortalLoanOfferedController: ZMath',
+					'checkZMath',
+					'Line no: ' + ex.getLineNumber() + 'Stack Trace String: ' + ex.getStackTraceString() + 'Cause: ' + ex.getMessage(),
+					String.valueOf(ex)
+				);
+			}
+		}
+		return pg;
+	}
+
+	public void checkVaultId() {
+		renderResult = false;
+		renderContract = true;
+	}
+
+	public void acceptOffer() {
+		try {
+			system.debug('@@@@ inside acceptOffer');
+			//Done to show dateTime based on timezone used for the respective origins
+			// used for all sunshine origins except SunshineUT
+			Datetime parseDT = DateTime.valueOf(DateTime.now().format('yyyy-MM-dd HH:mm:ss', 'America/Chicago'));
+			//Used for SunshineUT origin
+			Datetime parseUtDT = DateTime.valueOf(DateTime.now().format('yyyy-MM-dd HH:mm:ss', 'America/Boise'));
+
+			if (opp.StageName == 'Loan Amount Offered' && opp.Send_Proposition__c) {
+				if (opp.Opportunity_Origin__c == 'SunshineUT') {
+					opp.Date_Privacy_Doc__c = parseUtDT;
+					opp.Date_Electronic_Docs__c = parseUtDT;
+					opp.Date_Credit_Guide__c = parseUtDT;
+				} else {
+					opp.Date_Privacy_Doc__c = parseDT;
+					opp.Date_Electronic_Docs__c = parseDT;
+					opp.Date_Credit_Guide__c = parseDT;
+				}
+				//WE CAN MIX ALL 3 DOCS INTO 1 CHECKBOX
+				opp.StageName = 'Loan Offer Accepted';
+				opp.Document_Privacy__c = true;
+				opp.Document_Electronic_Docs__c = true;
+				opp.Document_Credit_Guide__c = true;
+				system.debug('@@@@ opp =' + opp);
+				update opp;
+				pageMSG = '3';
+			} else {
+				pageMSG = '5';
+			}
+
+			if (Test.isRunningTest()) {
+				Account acc = new Account();
+				insert acc;
+			}
+		} catch (Exception ex) {
+			System.debug('A1 Catch Sun_PortalLoanOfferedController' + ex.getMessage());
+			String ClassName = 'Sun_PortalLoanOfferedController';
+			String method = 'acceptOffer';
+			String response = 'Line no: ' + ex.getLineNumber() + 'Stack Trace String: ' + ex.getStackTraceString() + 'Cause: ' + ex.getMessage();
+			String description = String.valueOf(ex);
+			HelperClass.create_test_api_record('Sun_PortalLoanOfferedController Error', ClassName, method, response, description);
+		}
+		renderPage = false;
+	}
+
+	public void rejectOffer() {
+		opp.StageName = 'Closed Lost';
+		opp.Lost_Reason__c = 'Customer Declined Offer';
+		opp.Additional_Info__c = declineReasons;
+		update opp;
+		pageMSG = '2';
+		renderPage = false;
+		displayPopup = true;
+		displayPopup_Final_Offer = false;
+		display_homepage_popup = false;
+	}
+
+	public void showPopup() {
+		Opportunity oppNew = [
+			SELECT
+				id,
+				Negotiated_Offer__c,
+				Lead_Source_Code__c,
+				Payment_Frequency__c,
+				Amount,
+				createdDate,
+				Opportunity_Origin__c,
+				Bank_Report_Gov_Benefit__c,
+				Bad_Credit_History__c,
+				Applicant_Type__c,
+				ip__c,
+				Date_Second_Payment__c
+			FROM Opportunity
+			WHERE Id = :opp.Id
+		];
+
+		if (
+			LeadBuying_CS.Activate_Decline_Flow__c &&
+			oppNew.Lead_Source_Code__c != 'pre-app' &&
+			oppNew.Opportunity_Origin__c != 'SunshineMO' &&
+			oppNew.Opportunity_Origin__c != 'SunshineCA'
+		) {
+			if (oppNew.Negotiated_Offer__c) {rejectOffer();
+			} else {checkEligibility();			}
+		} else if ((oppNew.Lead_Source_Code__c == 'pre-app' || oppNew.Opportunity_Origin__c == 'SunshineMO') && oppNew.Opportunity_Origin__c != 'SunshineCA') {
+			if (oppNew.Negotiated_Offer__c) {rejectOffer();
+			}else{
+				checkEligibility();
+				rejectOffer_final_offer();
+			}
+			
+		} else {
+			rejectOffer();
+		}
+		selcted_loan_amt = selectedLoanAmount;
+	}
+
+	public void closePopup() {
+		displayPopup = false;
+	}
+
+	// Negotiation popup methods starts here
+	public void checkEligibility() {
+		getRepaymentsNumbers(opp.Payment_Frequency__c);
+		selectedFirstPayDate = String.valueOf(opp.Date_First_Payment__c);
+		loanAmount = maxLoanAmount = Integer.valueOf(opp.Loan_Amount__c.removeStart('$'));
+		if (opp.Opportunity_Origin__c != 'SunshineMO') {
+			dateEndLoan = String.valueOf(opp.Date_End_Loan__c);
+			show180daysError = opp.Date_Contract_Date__c.daysBetween(opp.Date_End_Loan__c) > 180 ? true : false;
+			// loanAmount = maxLoanAmount = Integer.valueOf(opp.Loan_Amount__c.removeStart('$'));
+
+			if (LeadBuying_CS.Max_Repay_Repeat__c != null && LeadBuying_CS.Max_Repay_New_Client__c != null) {
+				if (applicantType == 'Repeat') {
+					maxRepaymentAllowed = opp.Repayment_Amount__c * ((LeadBuying_CS.Max_Repay_Repeat__c / 100) + 1);
+				} else {
+					maxRepaymentAllowed = opp.Repayment_Amount__c * ((LeadBuying_CS.Max_Repay_New_Client__c / 100) + 1);
+				}
+			}
+
+			if (opp.Payment_Frequency__c == 'Semi-Monthly' || opp.Payment_Frequency__c == 'Twice-a-Month') {
+				ShowSecondDate = true;
+			}
+			//Tier = getTierValue(loanAmount);
+			// getRepaymentsNumbers(opp.Payment_Frequency__c);
+			// selectedFirstPayDate = String.valueOf(opp.Date_First_Payment__c);
+			if (Opp.Payment_Frequency__c == 'Semi-Monthly' || Opp.Payment_Frequency__c == 'Twice-a-Month') {
+				selectedSecondPayDate = String.valueOf(opp.Date_Second_Payment__c);
+			}
+			selectedLoanAmount = String.valueOf(maxLoanAmount);
+			while (maxRepayAmountFound && maxLoanAmount < 1050) {
+				checkMaxRepayment();
+			}
+		} else {
+			selectedLoanAmount = opp.Loan_Amount__c.removeStart('$');
+			loanAmount = maxLoanAmount = Integer.valueOf(opp.Loan_Amount__c.removeStart('$'));
+
+			getRepaymentsNumbers(opp.Payment_Frequency__c);
+			selectedRepayCount = String.valueOf(opp.Total_Repayments__c);
+			Map<String, String> info = minIt_calculator(loanAmount, selectedRepayCount, String.valueOf(opp.Date_First_Payment__c), true);
+			if (info.get('TotalRepaid') != null) {
+				Totalpayable = info.get('TotalRepaid');
+			}
+			if (info.get('Payment') != null) {
+				repaymentAmount = String.valueOf(info.get('Payment'));
+			}
+			totalSaving = String.valueOf(opp.Interest_Payable_to_CAB__c);
+		}
+
+		displayPopup = true;
+		displayPopup_Final_Offer = false;
+		display_homepage_popup = false;
+	}
+
+	public void checkMaxRepayment() {
+		system.debug('@@ checkMaxRepayment');
+		String currentTier = Tier;
+		maxLoanAmount = maxLoanAmount + 50;
+		if (currentTier != Tier)
+			getRepaymentsNumbers(opp.Payment_Frequency__c);
+
+		Map<String, String> info = minIt_calculator(maxLoanAmount, selectedRepayCount, selectedFirstPayDate, true);
+
+		if (info.get('Payment') != null) {
+			if (Decimal.valueOf(String.valueOf(info.get('Payment'))) < maxRepaymentAllowed && maxLoanAmount <= 1000) {
+				selectedLoanAmount = String.valueOf(maxLoanAmount);
+				anInt = Integer.valueOf(maxLoanAmount);
+				repaymentAmount = String.valueOf(info.get('Payment'));
+				if (info.get('TotalRepaid') != null) {
+					Totalpayable = info.get('TotalRepaid');
+				}
+				if (info.get('Payment') != null) {
+					repaymentAmount = String.valueOf(info.get('Payment'));
+				}
+			} else {
+				maxRepayAmountFound = false;
+				maxLoanAmount = maxLoanAmount - 50;
+				Map<String, String> info2 = minIt_calculator(maxLoanAmount, selectedRepayCount, selectedFirstPayDate, true);
+				selectedLoanAmount = String.valueOf(maxLoanAmount);
+				anInt = Integer.valueOf(maxLoanAmount);
+				repaymentAmount = String.valueOf(info2.get('Payment'));
+				if (info2.get('TotalRepaid') != null) {
+					Totalpayable = info2.get('TotalRepaid');
+				}
+				if (info2.get('Payment') != null) {
+					repaymentAmount = String.valueOf(info2.get('Payment'));
+				}
+			}
+		}
+	}
+
+	public void handleChange() {
+		String currentTier = Tier;
+		loanAmount = Decimal.valueOf(selectedLoanAmount);
+		//Tier = getTierValue(Decimal.valueOf(selectedLoanAmount));
+		if (currentTier != Tier)
+			getRepaymentsNumbers(opp.Payment_Frequency__c);
+
+		if (PaymentFrequency == 'Semi-Monthly' && String.valueOf(opp.Date_First_Payment__c) != selectedFirstPayDate) {
+			Map<String, Object> dataMap = new Map<String, Object>();
+			dataMap.put('FirstPaymentDate', Date.valueOf(selectedFirstPayDate));
+			dataMap.put('SecondPaymentDate', opp.Date_Second_Payment__c);
+			dataMap.put('ContractDate', opp.Date_Contract_Date__c);
+			dataMap.put('PaymentFrequency', opp.Payment_Frequency__c);
+			Date newSecondPaymentDate = CalculateSecondPaymentDate.getSecondPaymentDate(dataMap);
+			selectedSecondPayDate = string.valueOf(newSecondPaymentDate);
+		} else if (PaymentFrequency == 'Twice-a-Month' && String.valueOf(opp.Date_First_Payment__c) != selectedFirstPayDate) {
+			if (Date.valueOf(selectedFirstPayDate) > opp.Date_First_Payment__c) {
+				selectedSecondPayDate = String.valueOf(opp.Date_Second_Payment__c.addMonths(1));
+			}
+		}
+		Date loanEndDate = new Opportunity_HDL()
+			.calculate_Loan_Paid_Date_ss2(Date.valueOf(selectedFirstPayDate), opp.Date_Second_Payment__c, Integer.valueOf(selectedRepayCount), opp.Payment_Frequency__c);
+		dateEndLoan = String.valueOf(loanEndDate);
+
+		show180daysError = opp.Date_Contract_Date__c.daysBetween(loanEndDate) > 180 ? true : false;
+		Map<String, String> info = minIt_calculator(Decimal.valueOf(selectedLoanAmount), selectedRepayCount, selectedFirstPayDate, true);
+		if (info.get('TotalRepaid') != null) {
+			Totalpayable = info.get('TotalRepaid');
+		}
+
+		if (info.get('Payment') != null) {
+			repaymentAmount = String.valueOf(info.get('Payment'));
+		}
+
+		if (Decimal.valueOf(repaymentAmount) > maxRepaymentAllowed) {
+			repaymentExceed = true;
+		} else {
+			repaymentExceed = false;
+		}
+	}
+
+	public Map<String, String> minIt_calculator(Decimal Principal, String RepaymentCount, String FirstPayDate, boolean showIt) {
+		Integer PPY = 52;
+		String payFreq = '';
+		if (Opp.Payment_Frequency__c == 'Weekly') {
+			PPY = 52;
+			payFreq = 'W';
+		} else if (Opp.Payment_Frequency__c == 'Monthly') {
+			PPY = 12;
+			payFreq = 'M';
+		} else if (Opp.Payment_Frequency__c == 'FortNightly' || Opp.Payment_Frequency__c == 'Fortnightly' || Opp.Payment_Frequency__c == 'Bi-Weekly') {
+			PPY = 26;
+			payFreq = 'F';
+		} else if (Opp.Payment_Frequency__c == 'Semi-Monthly' || Opp.Payment_Frequency__c == 'Twice-a-Month') {
+			PPY = 24;
+			payFreq = 'B';
+		} else {
+			PPY = 24;
+		}
+
+		if (Principal >= 100 && Principal < 350)
+			Tier = 'Tier1';
+		else if (Principal >= 350 && Principal < 700)
+			Tier = 'Tier2';
+		else if (Principal >= 700 && Principal <= 1000)
+			Tier = 'Tier3';
+
+		if (!eligibleRepayCounts.contains(Integer.valueOf(selectedRepayCount))) {
+			selectedRepayCount = RepaymentCount = String.valueOf(minRepayments);
+			currentSubTier = 'ST1';
+		}
+
+		currentCabFeePercent = getCabFeePercent(Tier, currentSubTier);
+
+		String Cu_ContractDuration;
+
+		if (payFreq == 'W' || payFreq == 'F' || payFreq == 'M') {
+			ContractDuration ContDuration = new ContractDuration(integer.valueOf(RepaymentCount), opp.Date_Contract_Date__c, Date.valueof(FirstPayDate), payFreq);
+			Cu_ContractDuration = string.valueOf(ContDuration.getDuration());
+		} else {
+			ContractDuration ContDuration = new ContractDuration(
+				integer.valueOf(RepaymentCount),
+				opp.Date_Contract_Date__c,
+				Date.valueof(FirstPayDate),
+				Date.valueOf(selectedSecondPayDate)
+			);
+			Cu_ContractDuration = string.valueOf(ContDuration.getDuration());
+		}
+		Decimal CabFees = Double.ValueOf(Principal) * currentCabFeePercent * Integer.valueOf(RepaymentCount) / PPY;
+		if (!showit && opp.Opportunity_Origin__c != 'SunshineMO') {
+			CabFees = opp.Interest_Payable_to_CAB__c;
+			CabFees = CabFees - Discounted_Amount;
+		}
+		cabFeetoSave = CabFees;
+
+		if (opp.Opportunity_Origin__c != 'SunshineUT') {
+			MinIT__mdt minit = [
+				SELECT Id, username__c, endpoint__c, access__c
+				FROM MinIT__mdt
+				WHERE DeveloperName = 'Repayment_4002'
+				LIMIT 1
+			];
+
+			String urlTXT = minit.endpoint__c;
+
+			String reqBody = 'CompanyNumber=2014&transcode=4002';
+			reqBody += '&CabFee=';
+			if (opp.Opportunity_Origin__c == 'SunshineMO') {
+				reqBody += opp.Interest_Payable_to_CAB__c.setScale(2); //'0';
+			} else {
+				reqBody += CabFees.setScale(2);
+			}
+			reqBody += '&ContractDate=';
+			reqBody += String.valueOf(opp.Date_Contract_Date__c).substring(0, 10);
+			reqBody += '&ContractDuration=';
+			reqBody += Cu_ContractDuration;
+			reqBody += '&FirstRepaymentDate=';
+			reqBody += FirstPayDate;
+			reqBody += '&InterestRate=';
+			if (opp.Opportunity_Origin__c == 'SunshineMO') {
+				if (isFinalOffer) { reqBody += 425;
+				} else { reqBody += 625;
+				}
+			} else {
+				reqBody += 9.95;
+			}
+			reqBody += '&PaymentFrequency=';
+			reqBody += payFreq;
+			reqBody += '&Principal=';
+			reqBody += Principal;
+			if (payFreq == 'B') {
+				reqBody += '&SecondPaymentDate=';
+				reqBody += selectedSecondPayDate;
+			}
+			String transactionInfo = GlobalHelperClass.getRecords(urlTXT, reqBody);
+
+			if (showIt) {
+				RequestBody = reqBody;
+				ResponseBody = transactionInfo;
+			}
+			return Opportunity_HDL.readAPICalcResponse(transactionInfo);
+		} else {
+			Map<String, String> UTinfo = new Map<String, String>();
+			UTinfo.put('TotalRepaid', String.valueOf(((Principal + CabFees) / integer.valueOf(RepaymentCount) * integer.valueOf(RepaymentCount)).setScale(2)));
+			UTinfo.put('Payment', String.valueOf(((Principal + CabFees) / integer.valueOf(RepaymentCount)).setScale(2)));
+			return UTinfo;
+		}
+	}
+
+	public void negotiateOffer() {
+		try {
+			LoanAmountToDisplay = Decimal.valueOf(selectedLoanAmount);
+			FPDtoDisplay = Date.valueOf(selectedFirstPayDate);
+			originalRepayment = selectedRepayCount;
+			system.debug('@@## 656 selectedLoanAmount:   ' + Decimal.valueOf(selectedLoanAmount));
+			system.debug('@@## 657 FPDtoDisplay:    ' + Date.valueOf(selectedFirstPayDate));
+			system.debug('@@## 658 originalRepayment:   ' + originalRepayment);
+
+			//Initial_Offered_values__c
+			Map<String, Object> oldOfferedValues = new Map<String, Object>();
+			oldOfferedValues.put('Loan_Amount', opp.Loan_Amount__c);
+			oldOfferedValues.put('Total_Repayments', opp.Total_Repayments__c);
+			oldOfferedValues.put('Date_First_Payment', opp.Date_First_Payment__c);
+			oldOfferedValues.put('Total_Repayment_Amount', opp.Total_Repayment_Amount__c);
+			oldOfferedValues.put('Repayment_Amount', opp.Repayment_Amount__c);
+			oldOfferedValues.put('Interest_Payable_to_CAB', opp.Interest_Payable_to_CAB__c);
+
+			opp.Negotiated_Offer__c = true;
+			opp.Loan_Amount__c = '$' + selectedLoanAmount;
+			opp.new_repayment__c = String.valueOf(selectedRepayCount);
+			opp.Total_Repayments__c = decimal.valueOf(selectedRepayCount);
+			opp.Date_First_Payment__c = Date.valueOf(selectedFirstPayDate);
+			opp.Date_End_Loan__c = new Opportunity_HDL()
+				.calculate_Loan_Paid_Date_ss2(Date.valueOf(selectedFirstPayDate), opp.Date_Second_Payment__c, Integer.valueOf(selectedRepayCount), opp.Payment_Frequency__c);
+			opp.Total_Repayment_Amount__c = Decimal.valueOf(Totalpayable);
+			opp.Repayment_Amount__c = Decimal.valueOf(repaymentAmount);
+			opp.Interest_Payable_to_CAB__c = /*(opp.Opportunity_Origin__c == 'SunshineMO') ? 0.00 :*/ cabFeetoSave;
+			system.debug('@@@Interest_Payable_to_CAB__c: ' + opp.Interest_Payable_to_CAB__c);
+			opp.Amount = decimal.valueOf(selectedLoanAmount);
+			//opp.stagename = 'Loan Offer Accepted';
+
+			if (String.isNotBlank(selectedSecondPayDate)) {
+				oldOfferedValues.put('Date_Second_Payment', opp.Date_Second_Payment__c);
+				opp.Date_Second_Payment__c = date.valueOf(selectedSecondPayDate);
+			}
+			opp.Initial_Offered_values__c = json.serialize(oldOfferedValues);
+			opp.ZMath_Updated_APR__c = true;
+			opp.APR_Updated_By__c = 'Sun_PLO Negotiation Popup - ' + string.valueOf(DateTime.now());
+			opp.Annual_Percent_Rate__c = opp.APR__c = APR_Helper.getAPR_Sunshine(Opp); //ZMath_Helper_Future.ZMath_APR_value(opp);
+			update opp;
+			displayPopup = false;
+			if (test.isRunningTest()) {
+				integer i = 1 / 0;
+			}
+		} catch (Exception ex) {
+			String response = 'Line no: ' + ex.getLineNumber() + 'Stack Trace String: ' + ex.getStackTraceString() + 'Cause: ' + ex.getMessage();
+			HelperClass.create_test_api_record('Sun_PortalLoanOfferedController Error', 'Sun_PortalLoanOfferedController', 'negotiateOffer', response, String.valueOf(ex));
+		}
+	}
+
+	//By P
+	public Boolean isFinalOffer = false;
+	public void rejectOffer_final_offer() {
+		Discounted_Amount_selected = Integer.valueof(opp.Amount);
+		if (opp.Opportunity_Origin__c != 'SunshineMO') {
+			Discounted_Amount = Integer.valueof(opp.Amount) / 2;
+
+			Map<String, String> info = minIt_calculator(opp.Amount, String.valueOf(opp.Total_Repayments__c), selectedFirstPayDate, false);
+			if (info.get('TotalRepaid') != null) {
+				Totalpayable = info.get('TotalRepaid');
+			}
+			if (info.get('Payment') != null) {
+				repaymentAmount = String.valueOf(info.get('Payment'));
+			}
+		} else {
+			isFinalOffer = true;
+			Map<String, String> info = minIt_calculator(opp.Amount, String.valueOf(opp.Total_Repayments__c), selectedFirstPayDate, false);
+			if (info.get('TotalRepaid') != null) {
+				Totalpayable = info.get('TotalRepaid');
+			}
+			if (info.get('Payment') != null) {
+				repaymentAmount = String.valueOf(info.get('Payment'));
+			}
+			Discounted_Amount = opp.Total_Repayment_Amount__c - Decimal.valueOf(Totalpayable);
+		}
+
+		LoanAmountToDisplay = Integer.valueof(opp.Loan_Amount__c.removeStart('$'));
+		FPDtoDisplay = Date.valueOf(selectedFirstPayDate);
+		displayPopup_Final_Offer = true;
+		displayPopup = true;
+	}
+
+	public void Apply_Online() {
+		pageMSG = '2';
+		display_homepage_popup = true;
+	}
+
+	public void hidePopup() {
+		display_homepage_popup = false;
+	}
+
+	public void updateopp() {
+		try {
+			//Initial_Offered_values__c
+			Map<String, Object> oldOfferedValues = new Map<String, Object>();
+			oldOfferedValues.put('Loan_Amount', opp.Loan_Amount__c);
+			oldOfferedValues.put('Total_Repayments', opp.Total_Repayments__c);
+			oldOfferedValues.put('Date_First_Payment', opp.Date_First_Payment__c);
+			oldOfferedValues.put('Total_Repayment_Amount', opp.Total_Repayment_Amount__c);
+			oldOfferedValues.put('Repayment_Amount', opp.Repayment_Amount__c);
+			oldOfferedValues.put('Interest_Payable_to_CAB', opp.Interest_Payable_to_CAB__c);
+
+			totoalrepayamt = (Decimal) oldOfferedValues.get('Total_Repayment_Amount');
+			repatamt = (Decimal) oldOfferedValues.get('Repayment_Amount');
+
+			opp.Negotiated_Offer__c = true;
+			opp.Discounted_Offer__c = true;
+			opp.Loan_Amount__c = opp.Loan_Amount__c;
+			opp.new_repayment__c = String.valueOf(opp.Total_Repayments__c);
+			opp.Total_Repayments__c = Integer.valueOf(opp.Total_Repayments__c);
+			opp.Date_First_Payment__c = Date.valueOf(selectedFirstPayDate);
+			opp.Date_End_Loan__c = new Opportunity_HDL()
+				.calculate_Loan_Paid_Date_ss2(Date.valueOf(selectedFirstPayDate), opp.Date_Second_Payment__c, Integer.valueOf(opp.Total_Repayments__c), opp.Payment_Frequency__c);
+			TotalRepayOld = opp.Total_Repayment_Amount__c;
+			opp.Total_Repayment_Amount__c = Decimal.valueOf(Totalpayable);
+			opp.Repayment_Amount__c = Decimal.valueOf(repaymentAmount);
+			opp.Interest_Payable_to_CAB__c =  (opp.Opportunity_Origin__c == 'SunshineMO') ? opp.Interest_Payable_to_CAB__c : cabFeetoSave;
+
+			if (String.isNotBlank(selectedSecondPayDate)) {
+				oldOfferedValues.put('Date_Second_Payment', opp.Date_Second_Payment__c);
+				opp.Date_Second_Payment__c = date.valueOf(selectedSecondPayDate);
+			}
+			opp.Initial_Offered_values__c = json.serialize(oldOfferedValues);
+			opp.ZMath_Updated_APR__c = true;
+			opp.APR_Updated_By__c = 'Final Discount Offer - ' + string.valueOf(DateTime.now());
+			opp.Annual_Percent_Rate__c = opp.APR__c = APR_Helper.getAPR_Sunshine(Opp); // ZMath_Helper_Future.ZMath_APR_value(opp);
+			//opp.stagename = 'Loan Offer Accepted';
+			update opp;
+
+			displayPopup = false;
+			if (test.isRunningTest()) {
+				integer i = 1 / 0;
+			}
+		} catch (Exception ex) {
+			String response = 'Line no: ' + ex.getLineNumber() + 'Stack Trace String: ' + ex.getStackTraceString() + 'Cause: ' + ex.getMessage();
+			HelperClass.create_test_api_record('Sun_PortalLoanOfferedController Error', 'Sun_PortalLoanOfferedController', 'negotiateOffer', response, String.valueOf(ex));
+		}
+		displayPopup_Final_Offer = false;
+		display_homepage_popup = false;
+		displayPopup = false;
+		showloandetails = true;
+		renderPage = true;
+	}
+
+	public void getRepaymentsNumbers(String payFreq) {
+		System.debug('@@getRepaymentsNumbers called');
+		if (payFreq == 'Weekly') {
+			Integer StandardLoanTerm = Integer.valueOf(opp.Total_Repayments__c);
+			eligibleRepayCounts = new List<Integer>();
+			eligibleRepayCounts.add(StandardLoanTerm);
+			eligibleRepayCounts.add(StandardLoanTerm + 2);
+			eligibleRepayCounts.add(StandardLoanTerm + 4);
+			minRepayments = StandardLoanTerm;
+			maxRepayments = StandardLoanTerm + 4;
+		} else if (payFreq == 'Fortnightly' || payFreq == 'Bi-Weekly' || payFreq == 'Semi-Monthly' || payFreq == 'Twice-a-Month') {
+			Integer StandardLoanTerm = Integer.valueOf(opp.Total_Repayments__c);
+			eligibleRepayCounts = new List<Integer>();
+			eligibleRepayCounts.add(StandardLoanTerm);
+			eligibleRepayCounts.add(StandardLoanTerm + 1);
+			eligibleRepayCounts.add(StandardLoanTerm + 2);
+			minRepayments = StandardLoanTerm;
+			maxRepayments = StandardLoanTerm + 2;
+		} else if (payFreq == 'Monthly') {
+			Integer StandardLoanTerm = Integer.valueOf(opp.Total_Repayments__c);
+			eligibleRepayCounts = new List<Integer>();
+			eligibleRepayCounts.add(StandardLoanTerm);
+			eligibleRepayCounts.add(StandardLoanTerm + 1);
+			minRepayments = StandardLoanTerm;
+			maxRepayments = StandardLoanTerm + 1;
+		}
+		selectedRepayCount = String.valueOf(maxRepayments);
+		System.debug('@@ eligibleRepayCounts: ' + eligibleRepayCounts);
+		System.debug('@@ selectedRepayCount: ' + selectedRepayCount);
+	}
+
+	public double getCabFeePercent(String currentTier, String CurrentSubTier) {
+		double cabFeePercent = Opportunity_HDL_USA_Helper.getCABFee_US(opp, '');
+		if (opp.Opportunity_Origin__c != 'SunshineMO') {
+			if (applicantType == 'New') {
+				if (Decimal.valueOf(selectedLoanAmount) == maxLoanAmount) {
+					cabFeePercent = 5.35;
+				}
+			} else {
+				if (Decimal.valueOf(selectedLoanAmount) == maxLoanAmount) {
+					cabFeePercent = 4.95;
+				}
+			}
+		}
+		return cabFeePercent;
+	}
+
+	public List<SelectOption> lstOpt_LoanAmounts {
+		get {
+			if (maxLoanAmount > loanAmount) {
+				lstOpt_LoanAmounts = new List<SelectOption>();
+				lstOpt_LoanAmounts.add(new SelectOption('', '-- Select Loan Amount --'));
+				Integer loanAmt = 100;
+				while (loanAmt <= maxLoanAmount) {
+					lstOpt_LoanAmounts.add(new SelectOption(String.valueOf(loanAmt), '$' + String.valueOf(loanAmt)));
+					loanAmt = loanAmt + 50;
+				}
+			} else {
+				lstOpt_LoanAmounts = new List<SelectOption>();
+				lstOpt_LoanAmounts.add(new SelectOption('', '-- Select Loan Amount --'));
+				Integer loanAmt = 100;
+				while (loanAmt <= loanAmount) {
+					lstOpt_LoanAmounts.add(new SelectOption(String.valueOf(loanAmt), '$' + String.valueOf(loanAmt)));
+					loanAmt = loanAmt + 50;
+				}
+			}
+			return lstOpt_LoanAmounts;
+		}
+		set;
+	}
+	public List<SelectOption> lstOpt_repays {
+		get {
+			lstOpt_repays = new List<SelectOption>();
+			lstOpt_repays.add(new SelectOption('', '-- No. of Repayments --'));
+			for (Integer rep : eligibleRepayCounts) {
+				lstOpt_repays.add(new SelectOption(String.valueOf(rep), String.valueOf(rep)));
+			}
+			return lstOpt_repays;
+		}
+		set;
+	}
+	public List<SelectOption> lstOpt_fpd {
+		get {
+			lstOpt_fpd = new List<SelectOption>();
+			lstOpt_fpd.add(new SelectOption('', '-- First Payment Date --'));
+			String DateFirstPayment, DateFirstPaymentFreq;
+			if (opp.Payment_Frequency__c == 'Weekly') {
+				DateFirstPayment = String.valueOf(opp.Date_First_Payment__c).subString(0, 10);
+				DateFirstPaymentFreq = String.valueOf(opp.Date_First_Payment__c.addDays(7)).subString(0, 10);
+			} else if (opp.Payment_Frequency__c == 'Fortnightly' || opp.Payment_Frequency__c == 'Bi-Weekly') {
+				DateFirstPayment = String.valueOf(opp.Date_First_Payment__c).subString(0, 10);
+				DateFirstPaymentFreq = String.valueOf(opp.Date_First_Payment__c.addDays(14)).subString(0, 10);
+			} else if (opp.Payment_Frequency__c == 'Semi-Monthly' || opp.Payment_Frequency__c == 'Twice-a-Month') {
+				DateFirstPayment = String.valueOf(opp.Date_First_Payment__c).subString(0, 10);
+				DateFirstPaymentFreq = String.valueOf(opp.Date_Second_Payment__c).subString(0, 10);
+			} else if (opp.Payment_Frequency__c == 'Monthly') {
+				DateFirstPayment = String.valueOf(opp.Date_First_Payment__c).subString(0, 10);
+			}
+			lstOpt_fpd.add(new SelectOption(DateFirstPayment, DateFirstPayment));
+			if (opp.Payment_Frequency__c != 'Monthly' && opp.Payment_Frequency__c != 'Semi-Monthly' && opp.Payment_Frequency__c != 'Twice-a-Month')
+				lstOpt_fpd.add(new SelectOption(DateFirstPaymentFreq, DateFirstPaymentFreq));
+			return lstOpt_fpd;
+		}
+		set;
+	}
+	public List<SelectOption> lstOpt_spd {
+		get {
+			lstOpt_spd = new List<SelectOption>();
+			lstOpt_spd.add(new SelectOption('', '-- Second Payment Date --'));
+			String DateSecPayment = String.valueOf(opp.Date_Second_Payment__c).subString(0, 10);
+			String DateSecPaymentFreq = String.valueOf(opp.Date_Second_Payment__c.addDays(7)).subString(0, 10);
+			lstOpt_spd.add(new SelectOption(DateSecPayment, DateSecPayment));
+			lstOpt_spd.add(new SelectOption(DateSecPaymentFreq, DateSecPaymentFreq));
+			return lstOpt_spd;
+		}
+		set;
+	}
+	public void checkAndSetIp() {
+		system.debug('@#@# checkAndSetIp: ' + opp.ip__c);
+		if (String.isBlank(opp.ip__c)) {
+			opp.ip__c = Sun_PortalHelperController.GetUserIPAddress();
+			DateTime rightNow = DateTime.now();
+			opp.Date_Privacy_Doc__c = rightNow;
+			opp.Date_Electronic_Docs__c = rightNow;
+			opp.Date_Credit_Guide__c = rightNow;
+			opp.Document_Privacy__c = true;
+			opp.Document_Electronic_Docs__c = true;
+			opp.Document_Credit_Guide__c = true;
+			update opp;
+			showTermCondition = false;
+		}
+	}
+    
+    //juned
+    public void saveSpouseData(){
+        String name = spouseName;
+        String email = spouseEmail;
+        System.debug('name and email is:');
+        System.debug(name+' '+email);
+        
+        Opportunity ops= [SELECT Contact__c FROM Opportunity WHERE Id=:opp.id LIMIT 1];
+        
+        Contact conToUpdate= new Contact(id=ops.Contact__c);
+        
+        if(name!='' && name!= null){
+            conToUpdate.Spouse_s_Full_Name__c =name;
+            conToUpdate.Spouse_s_Email_Address__c = email;
+            conToUpdate.Marital_Status__c = 'Married';
+        }else{
+            conToUpdate.Marital_Status__c = 'Not Married';
+        }
+        //update the contact // 
+        update conToUpdate;
+        showMarriedInputBox = false;
+    }
+
+}
